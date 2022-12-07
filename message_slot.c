@@ -47,13 +47,13 @@ static int device_open(struct inode *inode, struct file *fp){
         /* Starting size will be 10 and we will allocate more if we need more */
         DEVICES[minor] = kmalloc(sizeof(struct channel) * 10, GFP_KERNEL);
         memset(DEVICES[minor], 0, sizeof(struct channel) * 10);
-        BOUNDRIES[minor] = kmalloc(sizeof(struct arrayBoundries));
+        BOUNDRIES[minor] = kmalloc(sizeof(struct arrayBoundries), GFP_KERNEL);
         BOUNDRIES[minor] -> aSize = 10;
         BOUNDRIES[minor] -> iNum = 0;
     }
     /* END MEMORY CHECKING */
     /* Setting the minor number in the fp private data */
-    fp->private_data = minor;
+    fp->private_data = (void *) minor;
     return SUCCESS;
 }
 
@@ -63,13 +63,13 @@ static int device_ioctl(struct file *fp, unsigned int channelId, unsigned long c
         errno = EINVAL;
         return -1;
     }
-    minor = fp->private_data;
+    minor = (int) fp->private_data;
     /* Checking if the channel even exists will happen in the write/read functions */
     USER_CHANNELS[minor] = channelId;
     return SUCCESS;
 }
 
-static ssize_t device_read(struct *file fp, char* userbuffer, size_t length, loff_t *offset){
+static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
     int minor, channelId, bytesRead = 0, i;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
@@ -110,7 +110,7 @@ static ssize_t device_read(struct *file fp, char* userbuffer, size_t length, lof
     return i;
 }
 
-static ssize_t device_write(strcut file *fp, const char *userBuffer, ssize_t length, loff_t *offset){
+static ssize_t device_write(struct file *fp, const char *userBuffer, ssize_t length, loff_t *offset){
     int minor, channelId, i;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_Array;
@@ -156,13 +156,13 @@ static ssize_t device_write(strcut file *fp, const char *userBuffer, ssize_t len
     return i;
 }
 
-struct file_operations Fops{
+struct file_operations{
     .owner = THIS_MODULE;
     .read = device_read;
     .write = device_write;
     .open = device_open;
     .ioctl = device_ioctl;
-}
+}Fops;
 
 
 static int __init init_message_slot(void){
@@ -188,7 +188,7 @@ static void __exit message_slot_cleanup(void){
         bounds = BOUNDRIES[i];
         numOfItems = bounds->iNum;
         for (j = 0; j < numOfItems; j++){
-            kfree(channels[j]);
+            kfree(channels + j);
         }
         kfree(channels);
         kfree(bounds);
