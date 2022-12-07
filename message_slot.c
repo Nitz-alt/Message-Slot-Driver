@@ -24,6 +24,10 @@ MODULE_LICENSE("GPL");
 #define MAX_CHANNELS 0x100000
 #define MAX_DEVICES 256
 
+#ifndef MSG_SLOT_CHANNEL
+#define MSG_SLOT_CHANNEL 10
+#endif
+
 struct channel{
     int id;
     int messageSize;
@@ -59,7 +63,7 @@ static int device_open(struct inode *inode, struct file *fp){
     return SUCCESS;
 }
 
-static int device_ioctl(struct file *fp, unsigned int channelId, unsigned long command){
+static long int device_ioctl(struct file *fp, unsigned int channelId, unsigned long command){
     int minor;
     if (command != MSG_SLOT_CHANNEL || channelId == 0){
         return -EINVAL;
@@ -107,7 +111,7 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     return i;
 }
 
-static ssize_t device_write(struct file *fp, const char *userBuffer, ssize_t length, loff_t *offset){
+static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
     int minor, channelId, i;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_Array;
@@ -137,8 +141,8 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, ssize_t len
             if (DEVICES[minor] == NULL) return -1;
             bounds -> aSize = bounds->aSize * 2;
         }
-        DEVICES[minor][bounds->iNum] = (struct channel) kmalloc(sizeof(struct channel), GFP_KERNEL);
-        if (DEVICES[minor][bounds->iNum] == NULL) return -1;
+        /*DEVICES[minor][bounds->iNum] = (struct channel) kmalloc(sizeof(struct channel), GFP_KERNEL);
+        if (DEVICES[minor][bounds->iNum] == NULL) return -1;*/
         ch = &(DEVICES[minor][bounds->iNum]);
         bounds->iNum++;
     }
