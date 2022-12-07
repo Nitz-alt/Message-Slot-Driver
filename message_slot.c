@@ -9,6 +9,7 @@
 #include <linux/fs.h>       /* for register_chrdev */
 #include <linux/uaccess.h>  /* for get_user and put_user */
 #include <linux/string.h>
+#include<linux/errno.h>
 
 
 
@@ -20,6 +21,7 @@ MODULE_LICENSE("GPL");
 #define DEVICE_FILE_NAME "message_device"
 #define MAJOR_NUM 235
 #define MAX_CHANNELS 0x100000
+#define MAX_DEVICES 256
 
 struct channel{
     int id;
@@ -33,9 +35,9 @@ struct arrayBoundries{
 };
 
 
-struct channel *DEVICES[256];
-int USER_CHANNELS[256];
-struct arrayBoundries BOUNDRIES[256];
+struct channel *DEVICES[MAX_DEVICES];
+int USER_CHANNELS[MAX_DEVICES];
+struct arrayBoundries *BOUNDRIES[MAX_DEVICES];
 
 static int device_open(struct inode *inode, struct file *fp){
     /* Check if the minor memory is allocated already. Otherwise allocate space for it*/
@@ -44,7 +46,9 @@ static int device_open(struct inode *inode, struct file *fp){
         /* Starting size will be 10 and we will allocate more if we need more */
         DEVICES[minor] = kmalloc(sizeof(struct channel) * 10, GFP_KERNEL);
         memset(DEVICES[minor], 0, sizeof(struct channel) * 10);
-        BOUNDRIES[minor] = {0, 10};
+        BOUNDRIES[minor] = kmalloc(sizeof(struct arrayBoundries));
+        BOUNDRIES[minor] -> aSize = 10;
+        BOUNDRIES[minor] -> iNum = 0;
     }
     /* END MEMORY CHECKING */
     /* Setting the minor number in the fp private data */
@@ -65,9 +69,9 @@ static int device_ioctl(struct file *fp, unsigned int channelId, unsigned long c
 }
 
 static ssize_t device_read(struct *file fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, channelId, bytesRead = 0, steps = 1;
-    struct arrayBoundries chBound;
-    struct channel *chAr;
+    int minor, channelId, bytesRead = 0, i;
+    struct arrayBoundries *chBound;
+    struct channel *channel_array, *ch;
     minor = fp->private_data;;
     char *msg;
     if (minor == -1){
@@ -75,32 +79,41 @@ static ssize_t device_read(struct *file fp, char* userbuffer, size_t length, lof
         return -1;
     }
     channelId = USER_CHANNELS[minor];
+    if (channelId == -1){
+        /* Not channel has been set*/
+        errno = EINVAL;
+        return -1;
+    }
     chBound = BOUNDRIES[minor];
-    chAr = DEVICES[minor];
+    channels_array = DEVICES[minor];
     /* char *msg = DEVICES[minor][channel].MESSAGE; */
     /* We need to search for the channel strcuture with the specific id*/
-    while (steps++ <= chBound.iNum && chAr != NULL && chAr -> id != channelId) chAr++;
-    if (chAr == NULL || steps == chBound.iNum + 1){
+    for (i = 0; i < chBound->iNum; i++){
+        ch = channel_array + i;
+        if (ch->id == channelId) break;
+    }
+    if (i == chBound->iNum){
+        /* Channel wasn't found */
         errno = EWOULDBLOCK;
         return -1;
     }
-    if (length < chAr->messageSize){
+    if (length < ch->messageSize){
+        /* The buffer size is smaller than the message */
         errno = ENOSPC;
         return -1;
     }
-    msg = chAr->MESSAGE;
-    while (length && *msg){
-        put_user(*(msg++), userbuffer++);
-        bytesRead++;
-        length--;
+    msg = ch->MESSAGE;
+    for (i = 0; i < length && i < MESSAGE_LEN; i++){
+        put_user(msg[i], userbuffer+i);
     }
-    return bytesRead;
+    return i;
 }
 
 static ssize_t device_write(strcut file *fp, const char *userBuffer, ssize_t length, loff_t *offset){
     int minor, channelId, i;
-    struct arrayBoundries bounds;
-    strcut channel *ch;
+    struct arrayBoundries *bounds;
+    struct channel *ch, *channel_Array;
+    char *msg;
     ssize_t i;
     if (length > MESSAGE_LEN){
         errno = EMSGSIZE;
@@ -108,31 +121,44 @@ static ssize_t device_write(strcut file *fp, const char *userBuffer, ssize_t len
     }
     minor = fp -> private_data;
     channelId = USER_CHANNELS[minor];
+    if (channelId == -1){
+        /* No channel has been set */
+        errno = EINVAL;
+        return -1;
+    }
     bounds = BOUNDRIES[minor];
     /* We need to look for the channel in the table */
-    ch = DEVICES[minor];
+    channel_Array = DEVICES[minor];
     for (i = 0; i < bounds.iNum; i++){
+        ch = channel_Array + i;
         if (ch->id == channelId) break;
     }
     if (i == bounds.iNum){
         /* There is no channel with the requested id ==> We need to create one */
+        /* No space in the array we need to realloc (by a factor of 2)*/
+        if (bounds.iNum == bounds.aSize){
+            DEVICES[minor] = krealloc(DEVICES[minor], bounds->aSize * 2 * sizeof(struct channel), GFP_KERNEL);
+            bounds -> aSize = bounds->aSize * 2;
+        }
+        DEVICES[minor][bounds.iNum] = kmalloc(sizeof(struct channel), GFP_KERNEL);
+        ch = DEVICES[minor][bounds.iNum];
+        bounds->iNum++;
     }
-    
-
-
-    
-
+    /* After channel lookup or creation we need to copy the data */
+    msg = ch->MESSAGE;
+    for (i = 0; i < length; i++){
+        get_user(*msg, *userBuffer);
+        msg++;
+        userBuffer++;
+    }
+    ch->messageSize = length;
+    return i;
 }
-
-
-
-
-
 
 struct file_operations Fops{
     .owner = THIS_MODULE;
     .read = device_read;
-    .write = NULL;
+    .write = device_write;
     .open = device_open;
     .ioctl = device_ioctl;
 }
@@ -143,15 +169,31 @@ static int __init init_message_slot(void){
         printk(KERN_ALERT "%s Registration failed for %d\n", DEVICE_FILE_NAME, MAJOR_NUM);
         return -1;
     }
+    /* Initializing memory */
+    memset(DEVICES, 0, sizeof(struct channel * ) * MAX_DEVICES);
+    memset(USER_CHANNELS, -1, sizeof(int) * MAX_DEVICES);
+    memset(BOUNDRIES, -1, sizeof(struct arrayBoundries) * MAX_DEVICES);
     return SUCCESS;
 }
 
 static void __exit message_slot_cleanup(void){
     /* Cleaning data. We need to release every channels */
-    int i;
+    int i,j, numOfItems;
+    struct arrayBoundries *bounds;
+    struct channel *channels;
+    /* Freeing channels data */
     for (i = 0; i < 256; i++){
-        kfree(DEVICES[i]);
+        channels = DEVICES[i];
+        bounds = BOUNDRIES[i];
+        numOfItems = bounds->iNum;
+        for (j = 0; j < numOfItems; j++){
+            kfree(channels[j]);
+        }
+        kfree(channels);
+        kfree(bounds);
     }
+    /* End of memory deallocation */
+    /* Unregistering the device */
     unregister_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME);
 }
 
