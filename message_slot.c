@@ -42,7 +42,7 @@ struct arrayBoundries{
 
 struct channel *DEVICES[MAX_DEVICES];
 int USER_CHANNELS[MAX_DEVICES];
-struct arrayBoundries *BOUNDRIES[MAX_DEVICES];
+struct arrayBoundries BOUNDRIES[MAX_DEVICES];
 
 static int device_open(struct inode *inode, struct file *fp){
     /* Check if the minor memory is allocated already. Otherwise allocate space for it*/
@@ -51,11 +51,11 @@ static int device_open(struct inode *inode, struct file *fp){
         /* Starting size will be 10 and we will allocate more if we need more */
         DEVICES[minor] = (struct channel *) kmalloc(sizeof(struct channel) * 10, GFP_KERNEL);
         if (DEVICES[minor] == NULL) return -1;
-        memset(DEVICES[minor], 0, sizeof(struct channel) * 10);
-        BOUNDRIES[minor] = (struct arrayBoundries *) kmalloc(sizeof(struct arrayBoundries), GFP_KERNEL);
-        if(BOUNDRIES[minor] == NULL) return -1;
-        BOUNDRIES[minor] -> aSize = 10;
-        BOUNDRIES[minor] -> iNum = 0;
+        memset(DEVICES[minor], -1, sizeof(struct channel) * 10);
+        /*BOUNDRIES[minor] = (struct arrayBoundries *) kmalloc(sizeof(struct arrayBoundries), GFP_KERNEL);
+        if(BOUNDRIES[minor] == NULL) return -1;*/
+        BOUNDRIES[minor].aSize = 10;
+        BOUNDRIES[minor].iNum = 0;
     }
     /* END MEMORY CHECKING */
     /* Setting the minor number in the fp private data */
@@ -88,9 +88,8 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
         /* Not channel has been set*/
         return -EINVAL;
     }
-    chBound = BOUNDRIES[minor];
+    chBound = &(BOUNDRIES[minor]);
     channel_array = DEVICES[minor];
-    /* char *msg = DEVICES[minor][channel].MESSAGE; */
     /* We need to search for the channel strcuture with the specific id*/
     for (i = 0; i < chBound->iNum; i++){
         ch = channel_array + i;
@@ -114,7 +113,7 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
 static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
     int minor, channelId, i;
     struct arrayBoundries *bounds;
-    struct channel *ch, *channel_Array;
+    struct channel *ch, *channel_array;
     char *msg;
     ssize_t j;
     if (length > MESSAGE_LEN){
@@ -126,11 +125,11 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
         /* No channel has been set */
         return -EINVAL;
     }
-    bounds = BOUNDRIES[minor];
+    bounds = &(BOUNDRIES[minor]);
     /* We need to look for the channel in the table */
-    channel_Array = DEVICES[minor];
+    channel_array = DEVICES[minor];
     for (i = 0; i < bounds->iNum; i++){
-        ch = channel_Array + i;
+        ch = channel_array + i;
         if (ch->id == channelId) break;
     }
     if (i == bounds->iNum){
@@ -171,6 +170,7 @@ static int __init init_message_slot(void){
         printk(KERN_ALERT "%s Registration failed for %d\n", DEVICE_FILE_NAME, MAJOR_NUM);
         return -1;
     }
+    printk("Loaded Module %s with major %d\n", DEVICE_FILE_NAME, MAJOR_NUM);
     /* Initializing memory */
     memset(DEVICES, 0, sizeof(struct channel * ) * MAX_DEVICES);
     memset(USER_CHANNELS, -1, sizeof(int) * MAX_DEVICES);
@@ -180,23 +180,15 @@ static int __init init_message_slot(void){
 
 static void __exit message_slot_cleanup(void){
     /* Cleaning data. We need to release every channels */
-    int i,j, numOfItems;
-    struct arrayBoundries *bounds;
-    struct channel *channels;
+    int i;
     /* Freeing channels data */
-    for (i = 0; i < 256; i++){
-        channels = DEVICES[i];
-        bounds = BOUNDRIES[i];
-        numOfItems = bounds->iNum;
-        for (j = 0; j < numOfItems; j++){
-            kfree(channels + j);
-        }
-        kfree(channels);
-        kfree(bounds);
+    for (i = 0; i < MAX_DEVICES; i++){
+        kfree(DEVICES[i]);
     }
     /* End of memory deallocation */
     /* Unregistering the device */
     unregister_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME);
+    printk("Unloaded moudel %s with major %d\n", DEVICE_FILE_NAME, MAJOR_NUM);
 }
 
 module_init(init_message_slot);
