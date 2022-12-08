@@ -13,23 +13,15 @@
 #include <linux/errno.h>
 
 
+/* Our header file */
+#include "message_slot.h"
+
 
 
 MODULE_LICENSE("GPL");
-#define SUCCESS 0
-#define DEVICE_RANGE_NAME "message_slot"
-#define MESSAGE_LEN 128
-#define DEVICE_FILE_NAME "message_device"
-#define MAJOR_NUM 235
-#define MAX_CHANNELS 0x100000
-#define MAX_DEVICES 256
-
-#ifndef MSG_SLOT_CHANNEL
-#define MSG_SLOT_CHANNEL 10
-#endif
 
 struct channel{
-    int id;
+    unsigned long id;
     int messageSize;
     char MESSAGE[128];
 };
@@ -40,9 +32,9 @@ struct arrayBoundries{
 };
 
 
-struct channel *DEVICES[MAX_DEVICES];
-int USER_CHANNELS[MAX_DEVICES];
-struct arrayBoundries BOUNDRIES[MAX_DEVICES];
+static struct channel *DEVICES[MAX_DEVICES];
+static unsigned long USER_CHANNELS[MAX_DEVICES];
+static struct arrayBoundries BOUNDRIES[MAX_DEVICES];
 
 static int device_open(struct inode *inode, struct file *fp){
     /* Check if the minor memory is allocated already. Otherwise allocate space for it*/
@@ -63,7 +55,7 @@ static int device_open(struct inode *inode, struct file *fp){
     return SUCCESS;
 }
 
-static long int device_ioctl(struct file *fp, unsigned int channelId, unsigned long command){
+static long int device_ioctl(struct file *fp, unsigned int command, unsigned long channelId){
     int minor;
     if (command != MSG_SLOT_CHANNEL || channelId == 0){
         return -EINVAL;
@@ -75,7 +67,8 @@ static long int device_ioctl(struct file *fp, unsigned int channelId, unsigned l
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, channelId, i;
+    int minor, i;
+    unsigned long channelId;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
     char *msg;
@@ -111,7 +104,8 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
 }
 
 static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
-    int minor, channelId, i;
+    int minor, i;
+    unsigned long channelId;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_array;
     char *msg;
