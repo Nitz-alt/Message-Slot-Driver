@@ -71,7 +71,7 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, i;
+    int minor, i, msgSize;
     unsigned long channelId;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
@@ -105,14 +105,15 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
         return -ENOSPC;
     }
     msg = ch->MESSAGE;
-    for (i = 0; i < length && i < ch->messageSize; i++){
+    msgSize = ch->messageSize;
+    for (i = 0; i < length && i < msgSize; i++){
         put_user(msg[i], userbuffer+i);
     }
     return i;
 }
 
 static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
-    int minor, i;
+    int minor, i, boundSize;
     unsigned long channelId;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_array;
@@ -139,12 +140,14 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
         /* There is no channel with the requested id ==> We need to create one */
         /* No space in the array we need to realloc (by a factor of 2)*/
         if (bounds->iNum == bounds->aSize){
-            DEVICES[minor] = (struct channel * ) krealloc(DEVICES[minor], bounds->aSize * 2 * sizeof(struct channel), GFP_KERNEL);
+            boundSize = bounds->aSize;
+            DEVICES[minor] = (struct channel * ) krealloc(DEVICES[minor], boundSize * 2 * sizeof(struct channel), GFP_KERNEL);
             if (DEVICES[minor] == NULL){
                 printk(KERN_ERR "Error allocating memory\n");
                 return -1;
             }
-            bounds -> aSize = bounds->aSize * 2;
+            memset(DEVICES[minor] + boundSize, -1, sizeof(struct channel) * boundSize);
+            bounds -> aSize = boundSize * 2;
         }
         /*DEVICES[minor][bounds->iNum] = (struct channel) kmalloc(sizeof(struct channel), GFP_KERNEL);
         if (DEVICES[minor][bounds->iNum] == NULL) return -1;*/
@@ -154,7 +157,6 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     }
     /* After channel lookup or creation we need to copy the data */
     msg = ch->MESSAGE;
-    memset(msg, 0, MESSAGE_LEN);
     for (j = 0; j < length; j++){
         get_user(*msg, userBuffer);
         msg++;
