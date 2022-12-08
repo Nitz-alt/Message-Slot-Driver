@@ -66,6 +66,7 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
     }
     minor = (int) fp->private_data;
     /* Checking if the channel even exists will happen in the write/read functions */
+    printk("channelid = %d\n", channelId);
     USER_CHANNELS[minor] = channelId;
     return SUCCESS;
 }
@@ -90,13 +91,15 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     chBound = &(BOUNDRIES[minor]);
     channel_array = DEVICES[minor];
     /* We need to search for the channel strcuture with the specific id*/
+    printk("channelBound iNum=%d\n", chBound->iNum);
     for (i = 0; i < chBound->iNum; i++){
         ch = channel_array + i;
+        printk("Channelid =%d", ch->id);
         if (ch->id == channelId) break;
     }
     if (i == chBound->iNum){
         /* Channel wasn't found */
-        printk(KERN_ERR "Channel was not opend\n");
+        printk(KERN_ERR "Channel was not found\n");
         return -EWOULDBLOCK;
     }
     if (length < ch->messageSize){
@@ -149,6 +152,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
         /*DEVICES[minor][bounds->iNum] = (struct channel) kmalloc(sizeof(struct channel), GFP_KERNEL);
         if (DEVICES[minor][bounds->iNum] == NULL) return -1;*/
         ch = &(DEVICES[minor][bounds->iNum]);
+        ch->id = channelId;
         bounds->iNum++;
     }
     /* After channel lookup or creation we need to copy the data */

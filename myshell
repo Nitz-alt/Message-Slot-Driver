@@ -1,0 +1,12 @@
+#!/bin/sh
+
+
+sudo rmmod message_slot
+sudo insmod message_slot.ko
+sudo rm /dev/message_dev
+sudo mknod /dev/message_dev c 235 0
+sudo chmod o+rw /dev/message_dev
+gcc -O3 -Wall -std=c11 message_sender.c -o message_sender.o
+gcc -O3 -Wall -std=c11 message_reader.c -o message_reader.o
+./message_sender.o /dev/message_dev 2 helloworld
+./message_reader.o /dev/message_dev 2
