@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "message_slot.h"
 
@@ -10,7 +11,7 @@
 
 
 int main(int argc, char *argv[]){
-    int fd, channelId;
+    int fd, channelId, messageLen;
     if (argc != 4){
         perror("3 Arugmenst need to be enter");
         return -1;
@@ -29,7 +30,9 @@ int main(int argc, char *argv[]){
         perror("Error setting channel id");
         return -1;
     }
-    if (write(fd, argv[3], MESSAGE_LEN) < 0){
+    /* Fiding length of the message given */
+    messageLen = strlen(argv[3]);
+    if (write(fd, argv[3], messageLen) < 0){
         perror("Error writing to device");
         return -1;
     }

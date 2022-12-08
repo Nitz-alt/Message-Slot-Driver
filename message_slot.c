@@ -66,7 +66,6 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
     }
     minor = (int) fp->private_data;
     /* Checking if the channel even exists will happen in the write/read functions */
-    printk("channelid = %d\n", channelId);
     USER_CHANNELS[minor] = channelId;
     return SUCCESS;
 }
@@ -91,10 +90,8 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     chBound = &(BOUNDRIES[minor]);
     channel_array = DEVICES[minor];
     /* We need to search for the channel strcuture with the specific id*/
-    printk("channelBound iNum=%d\n", chBound->iNum);
     for (i = 0; i < chBound->iNum; i++){
         ch = channel_array + i;
-        printk("Channelid =%d", ch->id);
         if (ch->id == channelId) break;
     }
     if (i == chBound->iNum){
@@ -108,7 +105,7 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
         return -ENOSPC;
     }
     msg = ch->MESSAGE;
-    for (i = 0; i < length && i < MESSAGE_LEN; i++){
+    for (i = 0; i < length && i < ch->messageSize; i++){
         put_user(msg[i], userbuffer+i);
     }
     return i;
@@ -157,6 +154,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     }
     /* After channel lookup or creation we need to copy the data */
     msg = ch->MESSAGE;
+    memset(msg, 0, MESSAGE_LEN);
     for (j = 0; j < length; j++){
         get_user(*msg, userBuffer);
         msg++;

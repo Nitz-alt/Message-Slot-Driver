@@ -38,5 +38,9 @@ int main(int argc, char *argv[]){
         perror("Error closing file");
         return -1;
     }
+    if (write(STDOUT_FILENO, msg, bytesRead) < 0){
+        perror("Error printing message");
+        return -1;
+    }
     return 0;
 }
