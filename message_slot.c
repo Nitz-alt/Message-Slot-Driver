@@ -42,7 +42,10 @@ static int device_open(struct inode *inode, struct file *fp){
     if (DEVICES[minor] == NULL){
         /* Starting size will be 10 and we will allocate more if we need more */
         DEVICES[minor] = (struct channel *) kmalloc(sizeof(struct channel) * 10, GFP_KERNEL);
-        if (DEVICES[minor] == NULL) return -1;
+        if (DEVICES[minor] == NULL){
+            printk(KERN_ERR "Error allocating memory\n");
+            return -1;
+        }
         memset(DEVICES[minor], -1, sizeof(struct channel) * 10);
         /*BOUNDRIES[minor] = (struct arrayBoundries *) kmalloc(sizeof(struct arrayBoundries), GFP_KERNEL);
         if(BOUNDRIES[minor] == NULL) return -1;*/
@@ -58,6 +61,7 @@ static int device_open(struct inode *inode, struct file *fp){
 static long int device_ioctl(struct file *fp, unsigned int command, unsigned long channelId){
     int minor;
     if (command != MSG_SLOT_CHANNEL || channelId == 0){
+        printk(KERN_ERR "IOCTL command not good\n");
         return -EINVAL;
     }
     minor = (int) fp->private_data;
@@ -74,11 +78,13 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     char *msg;
     minor = (int) fp->private_data;
     if (minor == -1){
+        printk(KERN_ERR "Error with minor\n");
         return -EINVAL;
     }
     channelId = USER_CHANNELS[minor];
     if (channelId == -1){
         /* Not channel has been set*/
+        printk(KERN_ERR "Channel id not set\n");
         return -EINVAL;
     }
     chBound = &(BOUNDRIES[minor]);
@@ -90,10 +96,12 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     }
     if (i == chBound->iNum){
         /* Channel wasn't found */
+        printk(KERN_ERR "Channel was not opend\n");
         return -EWOULDBLOCK;
     }
     if (length < ch->messageSize){
         /* The buffer size is smaller than the message */
+        printk(KERN_ERR "Not enough space in buffer\n");
         return -ENOSPC;
     }
     msg = ch->MESSAGE;
@@ -117,6 +125,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     channelId = USER_CHANNELS[minor];
     if (channelId == -1){
         /* No channel has been set */
+        printk(KERN_ERR "Channel id was not set\n");
         return -EINVAL;
     }
     bounds = &(BOUNDRIES[minor]);
@@ -131,7 +140,10 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
         /* No space in the array we need to realloc (by a factor of 2)*/
         if (bounds->iNum == bounds->aSize){
             DEVICES[minor] = (struct channel * ) krealloc(DEVICES[minor], bounds->aSize * 2 * sizeof(struct channel), GFP_KERNEL);
-            if (DEVICES[minor] == NULL) return -1;
+            if (DEVICES[minor] == NULL){
+                printk(KERN_ERR "Error allocating memory\n");
+                return -1;
+            }
             bounds -> aSize = bounds->aSize * 2;
         }
         /*DEVICES[minor][bounds->iNum] = (struct channel) kmalloc(sizeof(struct channel), GFP_KERNEL);
