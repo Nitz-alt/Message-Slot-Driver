@@ -163,7 +163,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
         userBuffer++;
     }
     ch->messageSize = length;
-    return i;
+    return j;
 }
 
 struct file_operations Fops = {
