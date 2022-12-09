@@ -47,8 +47,6 @@ static int device_open(struct inode *inode, struct file *fp){
             return -1;
         }
         memset(DEVICES[minor], -1, sizeof(struct channel) * 10);
-        /*BOUNDRIES[minor] = (struct arrayBoundries *) kmalloc(sizeof(struct arrayBoundries), GFP_KERNEL);
-        if(BOUNDRIES[minor] == NULL) return -1;*/
         BOUNDRIES[minor].aSize = 10;
         BOUNDRIES[minor].iNum = 0;
     }
