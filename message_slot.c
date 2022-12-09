@@ -33,12 +33,12 @@ struct arrayBoundries{
 
 
 static struct channel *DEVICES[MAX_DEVICES];
-static unsigned long USER_CHANNELS[MAX_DEVICES];
 static struct arrayBoundries BOUNDRIES[MAX_DEVICES];
 
 static int device_open(struct inode *inode, struct file *fp){
     /* Check if the minor memory is allocated already. Otherwise allocate space for it*/
     int minor = iminor(inode);
+    unsigned int *data;
     if (DEVICES[minor] == NULL){
         /* Starting size will be 10 and we will allocate more if we need more */
         DEVICES[minor] = (struct channel *) kmalloc(sizeof(struct channel) * 10, GFP_KERNEL);
@@ -54,34 +54,39 @@ static int device_open(struct inode *inode, struct file *fp){
     }
     /* END MEMORY CHECKING */
     /* Setting the minor number in the fp private data */
-    fp->private_data = (void *) minor;
+    data = (unsigned int *) kmalloc(sizeof(unsigned int) * 2, GFP_KERNEL);
+    memset(data, -1, sizeof(unsigned int) * 2);
+    data[0] = minor;
+    fp->private_data = (void *) data;
     return SUCCESS;
 }
 
 static long int device_ioctl(struct file *fp, unsigned int command, unsigned long channelId){
     int minor;
+    unsigned int *data;
     if (command != MSG_SLOT_CHANNEL || channelId == 0){
         printk(KERN_ERR "IOCTL command not good\n");
         return -EINVAL;
     }
-    minor = (int) fp->private_data;
-    /* Checking if the channel even exists will happen in the write/read functions */
-    USER_CHANNELS[minor] = channelId;
+    data = (unsigned int *) fp->private_data;
+    data[0] = minor;
     return SUCCESS;
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
     int minor, i, msgSize;
     unsigned long channelId;
+    unsigned int *data;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
     char *msg;
-    minor = (int) fp->private_data;
+    data = (unsigned int *) fp->private_data;
+    minor = data[0];
     if (minor == -1){
         printk(KERN_ERR "Error with minor\n");
         return -EINVAL;
     }
-    channelId = USER_CHANNELS[minor];
+    channelId = data[1];
     if (channelId == -1){
         /* Not channel has been set*/
         printk(KERN_ERR "Channel id not set\n");
@@ -115,6 +120,7 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
 static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
     int minor, i, boundSize;
     unsigned long channelId;
+    unsigned int *data;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_array;
     char *msg;
@@ -122,8 +128,9 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     if (length > MESSAGE_LEN){
         return -EMSGSIZE;
     }
-    minor = (int) fp -> private_data;
-    channelId = USER_CHANNELS[minor];
+    data = (unsigned int *) fp->private_data;
+    minor = data[0];
+    channelId = data[1];
     if (channelId == -1){
         /* No channel has been set */
         printk(KERN_ERR "Channel id was not set\n");
@@ -183,7 +190,6 @@ static int __init init_message_slot(void){
     printk("Loaded Module %s with major %d\n", DEVICE_FILE_NAME, MAJOR_NUM);
     /* Initializing memory */
     memset(DEVICES, 0, sizeof(struct channel * ) * MAX_DEVICES);
-    memset(USER_CHANNELS, -1, sizeof(int) * MAX_DEVICES);
     memset(BOUNDRIES, -1, sizeof(struct arrayBoundries) * MAX_DEVICES);
     return SUCCESS;
 }
