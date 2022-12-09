@@ -38,7 +38,7 @@ static struct arrayBoundries BOUNDRIES[MAX_DEVICES];
 static int device_open(struct inode *inode, struct file *fp){
     /* Check if the minor memory is allocated already. Otherwise allocate space for it*/
     int minor = iminor(inode);
-    unsigned int *data;
+    int *data;
     if (DEVICES[minor] == NULL){
         /* Starting size will be 10 and we will allocate more if we need more */
         DEVICES[minor] = (struct channel *) kmalloc(sizeof(struct channel) * 10, GFP_KERNEL);
@@ -62,7 +62,7 @@ static int device_open(struct inode *inode, struct file *fp){
 }
 
 static long int device_ioctl(struct file *fp, unsigned int command, unsigned long channelId){
-    unsigned int *data;
+    int *data;
     if (command != MSG_SLOT_CHANNEL || channelId == 0){
         printk(KERN_ERR "IOCTL command not good\n");
         return -EINVAL;
@@ -73,9 +73,7 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, i, msgSize;
-    unsigned long channelId;
-    unsigned int *data;
+    int minor, i, msgSize, channelId, *data;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
     char *msg;
@@ -117,17 +115,15 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
 }
 
 static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
-    int minor, i, boundSize;
-    unsigned long channelId;
-    unsigned int *data;
+    int minor, i, boundSize, *data, channelId;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_array;
     char *msg;
     ssize_t j;
-    if (length > MESSAGE_LEN){
+    if ((length > MESSAGE_LEN) | (length <= 0)){
         return -EMSGSIZE;
     }
-    data = (unsigned int *) fp->private_data;
+    data = (int *) fp->private_data;
     minor = data[0];
     channelId = data[1];
     if (channelId == -1){
