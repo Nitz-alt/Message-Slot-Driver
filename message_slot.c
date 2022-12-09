@@ -54,22 +54,21 @@ static int device_open(struct inode *inode, struct file *fp){
     }
     /* END MEMORY CHECKING */
     /* Setting the minor number in the fp private data */
-    data = (unsigned int *) kmalloc(sizeof(unsigned int) * 2, GFP_KERNEL);
-    memset(data, -1, sizeof(unsigned int) * 2);
+    data = (int *) kmalloc(sizeof(int) * 2, GFP_KERNEL);
+    memset(data, -1, sizeof(int) * 2);
     data[0] = minor;
     fp->private_data = (void *) data;
     return SUCCESS;
 }
 
 static long int device_ioctl(struct file *fp, unsigned int command, unsigned long channelId){
-    int minor;
     unsigned int *data;
     if (command != MSG_SLOT_CHANNEL || channelId == 0){
         printk(KERN_ERR "IOCTL command not good\n");
         return -EINVAL;
     }
-    data = (unsigned int *) fp->private_data;
-    data[0] = minor;
+    data = (int *) fp->private_data;
+    data[1] = channelId;
     return SUCCESS;
 }
 
