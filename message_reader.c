@@ -13,7 +13,7 @@ int main(int argc, char *argv[]){
     char msg[MESSAGE_LEN];
     int fd, channelId, bytesRead;
     if (argc != 3){
-        perror("3 Arugmenst need to be enter");
+        perror("Nubmber of arguments insufficient.\nPlease provide 2 arguments. Device path and channel id");
         return -1;
     }
    /* Enough argumnets given */

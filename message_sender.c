@@ -13,7 +13,7 @@
 int main(int argc, char *argv[]){
     int fd, channelId, messageLen;
     if (argc != 4){
-        perror("3 Arugmenst need to be enter");
+        perror("3 Arugmenst need to be entered");
         return -1;
     }
    /* Enough argumnets given */

@@ -23,7 +23,7 @@ MODULE_LICENSE("GPL");
 struct channel{
     unsigned long id;
     int messageSize;
-    char MESSAGE[128];
+    char MESSAGE[MESSAGE_LEN];
 };
 
 struct arrayBoundries{
@@ -71,10 +71,10 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, i, msgSize, channelId, *data;
+    int minor, i, msgSize, channelId, *data, j;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
-    char *msg;
+    char *msg, backupMsg[MESSAGE_LEN];
     data = (unsigned int *) fp->private_data;
     minor = data[0];
     if (minor == -1){
@@ -106,8 +106,21 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     }
     msg = ch->MESSAGE;
     msgSize = ch->messageSize;
+    /* Copying user buffer to use in case of failure */
+    for (j = 0 ; j < length && j < msgSize; j++){
+        if (get_user(backupMsg[i], userbuffer+j) < 0){
+            return -1;
+        }
+    }
+
     for (i = 0; i < length && i < msgSize; i++){
-        put_user(msg[i], userbuffer+i);
+        if(put_user(msg[i], userbuffer+i) < 0){
+            /* Failure ==> Rollback all writes */
+            for (j = 0 ; j < i; j++){
+                put_user(backupMsg[j], userbuffer + j);
+            }
+            return -1;
+        }
     }
     return i;
 }
@@ -116,7 +129,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     int minor, i, boundSize, *data, channelId;
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_array;
-    char *msg;
+    char *msg, backupMsg[MESSAGE_LEN];
     ssize_t j;
     if ((length > MESSAGE_LEN) | (length <= 0)){
         return -EMSGSIZE;
@@ -149,18 +162,22 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
             memset(DEVICES[minor] + boundSize, -1, sizeof(struct channel) * boundSize);
             bounds -> aSize = boundSize * 2;
         }
-        /*DEVICES[minor][bounds->iNum] = (struct channel) kmalloc(sizeof(struct channel), GFP_KERNEL);
-        if (DEVICES[minor][bounds->iNum] == NULL) return -1;*/
         ch = &(DEVICES[minor][bounds->iNum]);
         ch->id = channelId;
         bounds->iNum++;
     }
     /* After channel lookup or creation we need to copy the data */
     msg = ch->MESSAGE;
+    /* Reading message without changing channel message. This makes the write atomic */
     for (j = 0; j < length; j++){
-        get_user(*msg, userBuffer);
-        msg++;
-        userBuffer++;
+        /* Returning error if message retrieval went wrong for some reason */
+        if (get_user(backupMsg[j], userBuffer + j)){
+            return - 1;
+        }
+    }
+    /* After successful retrieval from user */
+    for (j = 0; j < length; j++){
+        msg[j] = backupMsg[j];
     }
     ch->messageSize = length;
     return j;
