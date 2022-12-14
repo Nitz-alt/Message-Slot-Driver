@@ -71,10 +71,10 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, i, msgSize, channelId, *data, j;
+    int minor, i, msgSize, channelId, *data;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
-    char *msg, backupMsg[MESSAGE_LEN];
+    char *msg;
     data = (unsigned int *) fp->private_data;
     minor = data[0];
     if (minor == -1){
@@ -106,19 +106,8 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     }
     msg = ch->MESSAGE;
     msgSize = ch->messageSize;
-    /* Copying user buffer to use in case of failure */
-    for (j = 0 ; j < length && j < msgSize; j++){
-        if (get_user(backupMsg[i], userbuffer+j) < 0){
-            return -1;
-        }
-    }
-
     for (i = 0; i < length && i < msgSize; i++){
         if(put_user(msg[i], userbuffer+i) < 0){
-            /* Failure ==> Rollback all writes */
-            for (j = 0 ; j < i; j++){
-                put_user(backupMsg[j], userbuffer + j);
-            }
             return -1;
         }
     }
@@ -171,7 +160,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     /* Reading message without changing channel message. This makes the write atomic */
     for (j = 0; j < length; j++){
         /* Returning error if message retrieval went wrong for some reason */
-        if (get_user(backupMsg[j], userBuffer + j)){
+        if (get_user(backupMsg[j], userBuffer + j) < 0){
             return - 1;
         }
     }

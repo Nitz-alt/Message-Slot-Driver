@@ -13,7 +13,7 @@
 int main(int argc, char *argv[]){
     int fd, channelId, messageLen;
     if (argc != 4){
-        perror("3 Arugmenst need to be entered");
+        perror("Nubmber of arguments insufficient.\nPlease provide 3 arguments. Device path and channel id and message");
         return -1;
     }
    /* Enough argumnets given */
@@ -40,5 +40,5 @@ int main(int argc, char *argv[]){
         perror("Error closing file");
         return -1;
     }
-    return 0;
+    return SUCCESS;
 }

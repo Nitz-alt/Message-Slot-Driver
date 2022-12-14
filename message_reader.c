@@ -42,5 +42,5 @@ int main(int argc, char *argv[]){
         perror("Error printing message");
         return -1;
     }
-    return 0;
+    return SUCCESS;
 }
