@@ -1,4 +1,5 @@
 #ifndef MESSAGE_SLOT_H
+
 #define MESSAGE_SLOT_H
 #define SUCCESS 0
 #define DEVICE_RANGE_NAME "message_slot"

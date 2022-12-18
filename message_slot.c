@@ -22,7 +22,7 @@ MODULE_LICENSE("GPL");
 
 struct channel{
     unsigned long id;
-    int messageSize;
+    size_t messageSize;
     char MESSAGE[MESSAGE_LEN];
 };
 
@@ -71,7 +71,8 @@ static long int device_ioctl(struct file *fp, unsigned int command, unsigned lon
 }
 
 static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, loff_t *offset){
-    int minor, i, msgSize, channelId, *data;
+    int minor, i, channelId, *data;
+    size_t msgSize, j;
     struct arrayBoundries *chBound;
     struct channel *channel_array, *ch;
     char *msg;
@@ -83,7 +84,7 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     }
     channelId = data[1];
     if (channelId == -1){
-        /* Not channel has been set*/
+        /* No channel has been set*/
         printk(KERN_ERR "Channel id not set\n");
         return -EINVAL;
     }
@@ -106,12 +107,12 @@ static ssize_t device_read(struct file *fp, char* userbuffer, size_t length, lof
     }
     msg = ch->MESSAGE;
     msgSize = ch->messageSize;
-    for (i = 0; i < length && i < msgSize; i++){
-        if(put_user(msg[i], userbuffer+i) < 0){
+    for (j = 0; j < length && j < msgSize; j++){
+        if(put_user(msg[j], userbuffer+j) < 0){
             return -1;
         }
     }
-    return i;
+    return j;
 }
 
 static ssize_t device_write(struct file *fp, const char *userBuffer, size_t length, loff_t *offset){
@@ -119,7 +120,7 @@ static ssize_t device_write(struct file *fp, const char *userBuffer, size_t leng
     struct arrayBoundries *bounds;
     struct channel *ch, *channel_array;
     char *msg, backupMsg[MESSAGE_LEN];
-    ssize_t j;
+    size_t j;
     if ((length > MESSAGE_LEN) | (length <= 0)){
         return -EMSGSIZE;
     }
