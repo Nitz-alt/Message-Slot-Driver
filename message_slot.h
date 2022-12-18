@@ -1,11 +1,7 @@
 #ifndef MESSAGE_SLOT_H
-
+#define MESSAGE_SLOT_H
 
 #include <linux/ioctl.h>
-
-
-
-#define MESSAGE_SLOT_H
 #define SUCCESS 0
 #define DEVICE_RANGE_NAME "message_slot"
 #define MESSAGE_LEN 128
